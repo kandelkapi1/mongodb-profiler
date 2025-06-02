@@ -23,19 +23,20 @@ function findJsFiles(dir) {
 // Extract queries including collection name, method, and raw query string
 function extractQueriesFromContent(content) {
   const queries = [];
-  // Matches db.<collection>.find(<args>)[.project(<args>)]?
-  const regex = /db\.(\w+)\.find\s*\(([\s\S]*?)\)(?:\.project\s*\(([\s\S]*?)\))?/g;
+  const regex = /db\.(\w+)\.(find|aggregate|update|delete)\s*\(([\s\S]*?)\)/g;
 
   let match;
   while ((match = regex.exec(content)) !== null) {
     const collection = match[1];
-    const findArg = match[2].trim();
-    const projectArg = match[3] ? match[3].trim() : null;
+    const method = match[2];
+    const rawQuery = match[3].trim();
 
-    // Compose rawQuery as an object with find and project to be interpreted in run-profiler.js
-    const rawQuery = JSON.stringify({ find: findArg, project: projectArg });
+    // Skip queries containing ellipsis or placeholders
+    if (/\.{3}/.test(rawQuery) || rawQuery === '{}' || rawQuery === '[]') {
+      continue; // skip incomplete or placeholder queries
+    }
 
-    queries.push({ collection, method: 'find', rawQuery });
+    queries.push({ collection, method, rawQuery });
   }
   return queries;
 }
