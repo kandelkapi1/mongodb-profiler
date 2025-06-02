@@ -10,6 +10,8 @@ async function runQueries(db) {
   ]);
 
   await users.find({ age: { $gt: 30 } }).sort({ name: 1 }).toArray();
+  console.log('Queries executeddd');
+  console.log(users, 'users');
 }
 
 module.exports = runQueries;

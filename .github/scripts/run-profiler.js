@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { MongoClient } = require('mongodb');
 const runQueries = require('../../queries/sample');
 
@@ -9,20 +11,10 @@ const runQueries = require('../../queries/sample');
     await client.connect();
     const db = client.db('testdb');
 
-    console.log('✅ Connected to MongoDB');
-
-    // Enable full profiling
     await db.command({ profile: 2 });
-    console.log('🔍 Profiling enabled (level 2)');
-
-    // Run the sample queries
     await runQueries(db);
-    console.log('📦 Queries executed');
-
-    // Wait a bit to ensure profiler has logged
     await new Promise((r) => setTimeout(r, 1000));
 
-    // Fetch profile logs
     const profileData = await db
       .collection('system.profile')
       .find()
@@ -30,15 +22,14 @@ const runQueries = require('../../queries/sample');
       .limit(10)
       .toArray();
 
-    console.log('--- MongoDB Profiling Output ---');
-    profileData.forEach((entry, i) => {
-      console.log(`\n#${i + 1}: ${entry.op} on ${entry.ns}`);
-      console.log(JSON.stringify(entry.command || entry.query, null, 2));
-      console.log(`Time: ${entry.millis} ms`);
-    });
+    const output = profileData.map((entry, i) => {
+      return `#${i + 1} - ${entry.op} on ${entry.ns}\n` +
+             `Command: ${JSON.stringify(entry.command || entry.query, null, 2)}\n` +
+             `Time: ${entry.millis} ms\n`;
+    }).join('\n\n');
 
-    await db.command({ profile: 0 });
-    console.log('🛑 Profiling disabled');
+    const filePath = path.join(__dirname, 'profiler-output.log');
+    fs.writeFileSync(filePath, output, 'utf8');
   } catch (err) {
     console.error('❌ Error:', err);
   } finally {
