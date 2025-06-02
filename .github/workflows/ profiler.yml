@@ -7,6 +7,8 @@ on:
 jobs:
   profile-queries:
     runs-on: ubuntu-latest
+    env:
+      MONGO_URI: ${{ secrets.MONGO_URI }}
 
     services:
       mongo:
