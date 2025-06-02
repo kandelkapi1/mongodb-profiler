@@ -1,9 +1,10 @@
 // .github/scripts/run-profiler.js
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 
-const MONGO_URI = 'mongodb://localhost:27017';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = 'test'; // change if needed
 const QUERIES_FILE = path.resolve(__dirname, 'queries.json');
 const OUTPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
