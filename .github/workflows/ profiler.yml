@@ -48,6 +48,7 @@ jobs:
 
       - name: Read profiler output
         id: read_log
+        shell: bash
         run: |
           {
             echo "log_output<<END_OF_LOG_12345"
