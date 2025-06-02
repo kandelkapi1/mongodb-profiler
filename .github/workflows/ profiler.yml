@@ -46,6 +46,9 @@ jobs:
           name: mongodb-profiler-log
           path: .github/scripts/profiler-output.log
 
+      - name: Debug profiler output head
+        run: head -n 20 .github/scripts/profiler-output.log
+
       - name: Read profiler output
         id: read_log
         shell: bash
