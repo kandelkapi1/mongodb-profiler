@@ -9,14 +9,19 @@ const DB_NAME = 'test'; // change if needed
 const QUERIES_FILE = path.resolve(__dirname, 'queries.json');
 const OUTPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
 
-// Safely parse raw query string into JS object
+// Parse raw query string into JS object
 async function parseRawQuery(raw) {
   try {
-    // Wrap in parentheses for object literals
-    return eval(`(${raw})`);
-  } catch (e) {
-    console.warn('Failed to parse raw query:', raw);
-    return null;
+    // Attempt JSON parse first
+    return JSON.parse(raw);
+  } catch {
+    try {
+      // Fallback: eval for JS object literal strings
+      return eval(`(${raw})`);
+    } catch (e) {
+      console.warn('Failed to parse raw query:', raw);
+      return null;
+    }
   }
 }
 
@@ -37,33 +42,60 @@ async function main() {
   for (const q of queries) {
     try {
       const { collection, method, rawQuery, file } = q;
-      const queryObj = await parseRawQuery(rawQuery);
-      if (!queryObj) {
-        results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
-        continue;
-      }
       if (!collection) {
         results.push({ file, collection, method, rawQuery, error: 'Collection name missing' });
         continue;
       }
 
       const coll = db.collection(collection);
-
       let explainResult;
 
       if (method === 'find') {
-        explainResult = await coll.find(queryObj).explain('executionStats');
+        // Check if rawQuery is a JSON string with find/project keys (from updated extract-queries.js)
+        let parsedQuery = null;
+        try {
+          parsedQuery = JSON.parse(rawQuery);
+        } catch {}
+
+        if (
+          parsedQuery &&
+          typeof parsedQuery === 'object' &&
+          ('find' in parsedQuery || 'project' in parsedQuery)
+        ) {
+          // Handle chained find/project calls
+          const filter = parsedQuery.find ? eval(`(${parsedQuery.find})`) : {};
+          const projection = parsedQuery.project ? eval(`(${parsedQuery.project})`) : {};
+          explainResult = await coll.find(filter).project(projection).explain('executionStats');
+        } else {
+          // Old style rawQuery: just find filter object
+          const queryObj = await parseRawQuery(rawQuery);
+          if (!queryObj) {
+            results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
+            continue;
+          }
+          explainResult = await coll.find(queryObj).explain('executionStats');
+        }
       } else if (method === 'aggregate') {
-        // queryObj should be an array of pipeline stages
+        const queryObj = await parseRawQuery(rawQuery);
         if (!Array.isArray(queryObj)) {
           results.push({ file, collection, method, rawQuery, error: 'Aggregate argument is not an array' });
           continue;
         }
         explainResult = await coll.aggregate(queryObj).explain('executionStats');
       } else if (method === 'update') {
+        const queryObj = await parseRawQuery(rawQuery);
+        if (!queryObj) {
+          results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
+          continue;
+        }
         // Explain find for update filter
         explainResult = await coll.find(queryObj).explain('executionStats');
       } else if (method === 'delete') {
+        const queryObj = await parseRawQuery(rawQuery);
+        if (!queryObj) {
+          results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
+          continue;
+        }
         // Explain find for delete filter
         explainResult = await coll.find(queryObj).explain('executionStats');
       } else {

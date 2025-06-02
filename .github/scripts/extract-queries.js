@@ -23,19 +23,23 @@ function findJsFiles(dir) {
 // Extract queries including collection name, method, and raw query string
 function extractQueriesFromContent(content) {
   const queries = [];
-  // Regex to capture: db.<collection>.<method>(<args>)
-  // e.g. db.users.find({...}), db.orders.aggregate([...])
-  const regex = /db\.(\w+)\.(find|aggregate|update|delete)\s*\(([\s\S]*?)\)/g;
+  // Matches db.<collection>.find(<args>)[.project(<args>)]?
+  const regex = /db\.(\w+)\.find\s*\(([\s\S]*?)\)(?:\.project\s*\(([\s\S]*?)\))?/g;
 
   let match;
   while ((match = regex.exec(content)) !== null) {
     const collection = match[1];
-    const method = match[2];
-    const rawQuery = match[3].trim();
-    queries.push({ collection, method, rawQuery });
+    const findArg = match[2].trim();
+    const projectArg = match[3] ? match[3].trim() : null;
+
+    // Compose rawQuery as an object with find and project to be interpreted in run-profiler.js
+    const rawQuery = JSON.stringify({ find: findArg, project: projectArg });
+
+    queries.push({ collection, method: 'find', rawQuery });
   }
   return queries;
 }
+
 
 async function main() {
   const files = findJsFiles(SEARCH_DIR);
