@@ -5,7 +5,7 @@ const path = require('path');
 const { MongoClient } = require('mongodb');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-const DB_NAME = process.env.DB_NAME || 'test'; // Allow DB name from env
+const DB_NAME = process.env.DB_NAME || 'data'; // Allow DB name from env
 const QUERIES_FILE = path.resolve(__dirname, 'queries.json');
 const OUTPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
 
