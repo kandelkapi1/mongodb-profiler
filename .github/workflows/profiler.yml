@@ -39,6 +39,10 @@ jobs:
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           DB_NAME: ${{ secrets.DB_NAME }}
+          MAX_EXECUTION_TIME_MS: ${{ secrets.MAX_EXECUTION_TIME_MS }}
+          WARN_EXECUTION_TIME_MS: ${{ secrets.WARN_EXECUTION_TIME_MS }}
+          MAX_DOCS_EXAMINED: ${{ secrets.MAX_DOCS_EXAMINED }}
+          MIN_QUERY_EFFICIENCY: ${{ secrets.MIN_QUERY_EFFICIENCY }}
         run: |
           if [ -n "$MONGO_URI" ]; then
             echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
@@ -49,6 +53,31 @@ jobs:
             echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
           else
             echo "DB_NAME=data" >> $GITHUB_ENV
+          fi
+          
+          # Performance thresholds (with defaults if not set in secrets)
+          if [ -n "$MAX_EXECUTION_TIME_MS" ]; then
+            echo "MAX_EXECUTION_TIME_MS=$MAX_EXECUTION_TIME_MS" >> $GITHUB_ENV
+          else
+            echo "MAX_EXECUTION_TIME_MS=100" >> $GITHUB_ENV
+          fi
+          
+          if [ -n "$WARN_EXECUTION_TIME_MS" ]; then
+            echo "WARN_EXECUTION_TIME_MS=$WARN_EXECUTION_TIME_MS" >> $GITHUB_ENV
+          else
+            echo "WARN_EXECUTION_TIME_MS=50" >> $GITHUB_ENV
+          fi
+          
+          if [ -n "$MAX_DOCS_EXAMINED" ]; then
+            echo "MAX_DOCS_EXAMINED=$MAX_DOCS_EXAMINED" >> $GITHUB_ENV
+          else
+            echo "MAX_DOCS_EXAMINED=500" >> $GITHUB_ENV
+          fi
+          
+          if [ -n "$MIN_QUERY_EFFICIENCY" ]; then
+            echo "MIN_QUERY_EFFICIENCY=$MIN_QUERY_EFFICIENCY" >> $GITHUB_ENV
+          else
+            echo "MIN_QUERY_EFFICIENCY=0.1" >> $GITHUB_ENV
           fi
 
       - name: Debug MongoDB service
