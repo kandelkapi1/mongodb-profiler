@@ -14,11 +14,11 @@ jobs:
         ports:
           - 27017:27017
         options: >-
-          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-cmd "mongo --eval 'db.runCommand({ ping: 1 })'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          --health-start-period 10s
+          --health-start-period 20s
 
     steps:
       - name: Checkout code
@@ -37,12 +37,33 @@ jobs:
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
         run: |
-          echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
+          if [ -n "$MONGO_URI" ]; then
+            echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
+          else
+            echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
+          fi
           echo "DB_NAME=test" >> $GITHUB_ENV
 
       - name: Wait for MongoDB to be ready
         run: |
-          timeout 30 bash -c 'until mongosh --eval "db.runCommand({ ping: 1 })" > /dev/null 2>&1; do sleep 1; done'
+          echo "Waiting for MongoDB to be ready..."
+          timeout 60 bash -c '
+            until mongo --eval "db.runCommand({ ping: 1 })" --quiet > /dev/null 2>&1; do 
+              echo "MongoDB not ready yet, waiting..."
+              sleep 2
+            done
+          '
+          echo "✅ MongoDB is ready!"
+
+      - name: Test MongoDB connection
+        run: |
+          echo "Testing MongoDB connection..."
+          mongo --eval "
+            print('MongoDB version: ' + version());
+            print('Connection successful!');
+            db = db.getSiblingDB('test');
+            print('Using database: test');
+          " --quiet
 
       - name: Extract MongoDB queries
         id: extract
