@@ -14,7 +14,7 @@ jobs:
         ports:
           - 27017:27017
         env:
-          MONGO_INITDB_DATABASE: data
+          MONGO_INITDB_DATABASE: ${{ env.DB_NAME }}
         options: >-
           --health-cmd "data -e /tmp/mongodb-27017.sock || mongod --version"
           --health-interval 30s
@@ -38,13 +38,18 @@ jobs:
       - name: Set up environment
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: |
           if [ -n "$MONGO_URI" ]; then
             echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
           else
             echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
           fi
-          echo "DB_NAME=data" >> $GITHUB_ENV
+          if [ -n "$DB_NAME" ]; then
+            echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
+          else
+            echo "DB_NAME=data" >> $GITHUB_ENV
+          fi
 
       - name: Debug MongoDB service
         run: |
