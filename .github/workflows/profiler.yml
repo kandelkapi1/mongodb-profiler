@@ -14,9 +14,9 @@ jobs:
         ports:
           - 27017:27017
         env:
-          MONGO_INITDB_DATABASE: test
+          MONGO_INITDB_DATABASE: data
         options: >-
-          --health-cmd "test -e /tmp/mongodb-27017.sock || mongod --version"
+          --health-cmd "data -e /tmp/mongodb-27017.sock || mongod --version"
           --health-interval 30s
           --health-timeout 10s
           --health-retries 5
@@ -44,7 +44,7 @@ jobs:
           else
             echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
           fi
-          echo "DB_NAME=test" >> $GITHUB_ENV
+          echo "DB_NAME=data" >> $GITHUB_ENV
 
       - name: Debug MongoDB service
         run: |
@@ -98,12 +98,12 @@ jobs:
               
               // Test basic operations
               const testCollection = db.collection('test_connection');
-              await testCollection.insertOne({ test: 'connection', timestamp: new Date() });
+              await testCollection.insertOne({ data: 'connection', timestamp: new Date() });
               const count = await testCollection.countDocuments({});
               console.log('✅ Test document operations successful. Count:', count);
               
               await client.close();
-              console.log('✅ MongoDB connection test completed successfully!');
+              console.log('✅ MongoDB connection data completed successfully!');
             } catch (error) {
               console.error('❌ MongoDB connection failed:', error.message);
               console.error('Full error:', error);
