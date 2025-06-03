@@ -6,6 +6,16 @@ const INPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
 const SUMMARY_FILE = path.resolve(__dirname, 'profiler-summary.log');
 const PR_REPORT_FILE = path.resolve(__dirname, 'pr-query-report.md');
 
+// Performance thresholds from environment variables or defaults
+const THRESHOLDS = {
+  MAX_EXECUTION_TIME_MS: parseInt(process.env.MAX_EXECUTION_TIME_MS) || 100,
+  WARN_EXECUTION_TIME_MS: parseInt(process.env.WARN_EXECUTION_TIME_MS) || 50,
+  MAX_DOCS_EXAMINED: parseInt(process.env.MAX_DOCS_EXAMINED) || 500,
+  MIN_QUERY_EFFICIENCY: parseFloat(process.env.MIN_QUERY_EFFICIENCY) || 0.1
+};
+
+console.log('Using performance thresholds:', THRESHOLDS);
+
 function summarizeExplain(explain) {
   const stats = explain?.executionStats || {};
   const totalMillis = stats.executionTimeMillis || 0;
@@ -63,11 +73,23 @@ function analyzePerformance(result) {
   const warnings = [];
   const suggestions = [];
 
-  // Performance thresholds
-  if (totalMillis > 100) {
-    issues.push(`Slow query: ${totalMillis}ms execution time`);
-  } else if (totalMillis > 50) {
-    warnings.push(`Moderate execution time: ${totalMillis}ms`);
+  // Handle empty collections (EOF stage)
+  if (stage === 'EOF') {
+    warnings.push('Query executed on empty collection - no performance issues to analyze');
+    return {
+      performanceScore: 'Good',
+      issues,
+      warnings,
+      suggestions: ['Consider adding test data to validate query performance']
+    };
+  }
+
+  // Execution time thresholds
+  if (totalMillis > THRESHOLDS.MAX_EXECUTION_TIME_MS) {
+    issues.push(`Slow query: ${totalMillis}ms execution time (threshold: ${THRESHOLDS.MAX_EXECUTION_TIME_MS}ms)`);
+    suggestions.push('Consider optimizing query filters and adding appropriate indexes');
+  } else if (totalMillis > THRESHOLDS.WARN_EXECUTION_TIME_MS) {
+    warnings.push(`Moderate execution time: ${totalMillis}ms (warning threshold: ${THRESHOLDS.WARN_EXECUTION_TIME_MS}ms)`);
   }
 
   // Index usage analysis
@@ -76,18 +98,25 @@ function analyzePerformance(result) {
     suggestions.push('Consider adding an appropriate index for this query');
   }
 
+  // Document examination threshold
+  if (docsExamined > THRESHOLDS.MAX_DOCS_EXAMINED) {
+    issues.push(`High document examination: ${docsExamined} documents scanned (threshold: ${THRESHOLDS.MAX_DOCS_EXAMINED})`);
+    suggestions.push('Query examines too many documents - consider more selective filters or better indexing');
+  }
+
   // Efficiency analysis
   if (docsExamined > 0 && docsReturned > 0) {
     const efficiency = docsReturned / docsExamined;
-    if (efficiency < 0.1) {
-      warnings.push(`Low query efficiency: ${(efficiency * 100).toFixed(1)}% (${docsReturned}/${docsExamined} docs)`);
+    if (efficiency < THRESHOLDS.MIN_QUERY_EFFICIENCY) {
+      warnings.push(`Low query efficiency: ${(efficiency * 100).toFixed(1)}% (${docsReturned}/${docsExamined} docs, threshold: ${(THRESHOLDS.MIN_QUERY_EFFICIENCY * 100).toFixed(1)}%)`);
       suggestions.push('Query examines many documents but returns few - consider more selective filters');
     }
   }
 
-  // Large document examination
-  if (docsExamined > 1000) {
-    warnings.push(`High document examination: ${docsExamined} documents scanned`);
+  // Special case: examined documents but returned none
+  if (docsExamined > 0 && docsReturned === 0) {
+    warnings.push(`Query examined ${docsExamined} documents but returned none - possible inefficient query`);
+    suggestions.push('Review query filters to ensure they match actual data or add appropriate indexes');
   }
 
   return {
@@ -103,6 +132,13 @@ function generatePRReport(results) {
     '# MongoDB Query Performance Report',
     '',
     'This report analyzes the performance of MongoDB queries found in the codebase.',
+    '',
+    '## Performance Thresholds',
+    '',
+    `- **Slow Query**: > ${THRESHOLDS.MAX_EXECUTION_TIME_MS}ms execution time`,
+    `- **Warning**: > ${THRESHOLDS.WARN_EXECUTION_TIME_MS}ms execution time`,
+    `- **High Document Examination**: > ${THRESHOLDS.MAX_DOCS_EXAMINED} documents scanned`,
+    `- **Low Efficiency**: < ${(THRESHOLDS.MIN_QUERY_EFFICIENCY * 100).toFixed(1)}% query efficiency`,
     '',
     '## Summary',
     ''
@@ -175,6 +211,10 @@ function generatePRReport(results) {
     lines.push(`**Index Used**: \`${summary.indexUsed}\``);
     lines.push(`**Documents Examined**: ${summary.docsExamined}`);
     lines.push(`**Documents Returned**: ${summary.docsReturned}`);
+    if (summary.docsExamined > 0 && summary.docsReturned > 0) {
+      const efficiency = ((summary.docsReturned / summary.docsExamined) * 100).toFixed(1);
+      lines.push(`**Query Efficiency**: ${efficiency}%`);
+    }
     lines.push('');
 
     if (analysis.issues.length > 0) {
@@ -211,6 +251,7 @@ function generatePRReport(results) {
       lines.push('- Review queries marked as "Poor Performance"');
       lines.push('- Add indexes for queries performing collection scans');
       lines.push('- Optimize query filters to be more selective');
+      lines.push(`- Reduce document examination below ${THRESHOLDS.MAX_DOCS_EXAMINED} documents`);
       lines.push('');
     }
     

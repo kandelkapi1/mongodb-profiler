@@ -8,6 +8,7 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'data'; // Allow DB name from env
 const QUERIES_FILE = path.resolve(__dirname, 'queries.json');
 const OUTPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
+const MAX_DOCS_EXAMINED = parseInt(process.env.MAX_DOCS_EXAMINED) || 500; // Limit docs examined for profiling
 
 // Parse raw query string into JS object
 async function parseRawQuery(raw) {
@@ -40,9 +41,8 @@ async function getExplainResult(collection, method, rawQuery, pattern) {
       if (parsedQuery.sort) {
         cursor = cursor.sort(eval(`(${parsedQuery.sort})`));
       }
-      if (parsedQuery.limit) {
-        cursor = cursor.limit(parseInt(parsedQuery.limit));
-      }
+      // Always apply limit for profiling to avoid full collection scans
+      cursor = cursor.limit(MAX_DOCS_EXAMINED);
       if (parsedQuery.skip) {
         cursor = cursor.skip(parseInt(parsedQuery.skip));
       }
@@ -56,46 +56,48 @@ async function getExplainResult(collection, method, rawQuery, pattern) {
       return { error: 'Invalid query syntax' };
     }
 
-    // Handle different MongoDB methods
+    // Handle different MongoDB methods with document examination limit
     switch (method.toLowerCase()) {
       case 'find':
       case 'findone':
-        return await collection.find(queryObj).explain('executionStats');
+        return await collection.find(queryObj).limit(MAX_DOCS_EXAMINED).explain('executionStats');
       
       case 'findbyid':
         // Convert string ID to ObjectId if needed
         const id = typeof queryObj === 'string' ? queryObj : queryObj._id || queryObj.id;
-        return await collection.find({ _id: id }).explain('executionStats');
+        return await collection.find({ _id: id }).limit(MAX_DOCS_EXAMINED).explain('executionStats');
       
       case 'aggregate':
         if (!Array.isArray(queryObj)) {
           return { error: 'Aggregate pipeline must be an array' };
         }
+        // Add $limit stage to aggregate pipeline
+        queryObj.push({ $limit: MAX_DOCS_EXAMINED });
         return await collection.aggregate(queryObj).explain('executionStats');
       
       case 'updateone':
       case 'updatemany':
       case 'replaceone':
-        // For updates, explain the find part (filter)
+        // For updates, explain the find part (filter) with limit
         if (Array.isArray(queryObj) && queryObj.length >= 1) {
-          return await collection.find(queryObj[0]).explain('executionStats');
+          return await collection.find(queryObj[0]).limit(MAX_DOCS_EXAMINED).explain('executionStats');
         }
-        return await collection.find(queryObj).explain('executionStats');
+        return await collection.find(queryObj).limit(MAX_DOCS_EXAMINED).explain('executionStats');
       
       case 'deleteone':
       case 'deletemany':
-        return await collection.find(queryObj).explain('executionStats');
+        return await collection.find(queryObj).limit(MAX_DOCS_EXAMINED).explain('executionStats');
       
       case 'countdocuments':
       case 'estimateddocumentcount':
-        return await collection.find(queryObj).explain('executionStats');
+        return await collection.find(queryObj).limit(MAX_DOCS_EXAMINED).explain('executionStats');
       
       case 'distinct':
-        // For distinct, we can only explain the filter part
+        // For distinct, we can only explain the filter part with limit
         if (Array.isArray(queryObj) && queryObj.length >= 2) {
-          return await collection.find(queryObj[1] || {}).explain('executionStats');
+          return await collection.find(queryObj[1] || {}).limit(MAX_DOCS_EXAMINED).explain('executionStats');
         }
-        return await collection.find({}).explain('executionStats');
+        return await collection.find({}).limit(MAX_DOCS_EXAMINED).explain('executionStats');
       
       case 'insertone':
       case 'insertmany':
@@ -115,6 +117,7 @@ async function main() {
   await client.connect();
   console.log(`Connected to MongoDB at ${MONGO_URI}`);
   console.log(`Using database: ${DB_NAME}`);
+  console.log(`Profiling limited to examining ${MAX_DOCS_EXAMINED} documents per query`);
   
   const db = client.db(DB_NAME);
 
