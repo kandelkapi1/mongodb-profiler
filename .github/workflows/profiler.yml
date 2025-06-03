@@ -1,0 +1,163 @@
+name: MongoDB Query Profiler
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  profile-queries:
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:5.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up environment
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
+          echo "DB_NAME=test" >> $GITHUB_ENV
+
+      - name: Wait for MongoDB to be ready
+        run: |
+          timeout 30 bash -c 'until mongosh --eval "db.runCommand({ ping: 1 })" > /dev/null 2>&1; do sleep 1; done'
+
+      - name: Extract MongoDB queries
+        id: extract
+        run: |
+          echo "🔍 Extracting MongoDB queries from codebase..."
+          npm run extract
+        continue-on-error: false
+
+      - name: Run profiler on extracted queries
+        id: analyze
+        if: steps.extract.outcome == 'success'
+        run: |
+          echo "⚡ Running MongoDB profiler..."
+          npm run analyze
+        continue-on-error: true
+
+      - name: Generate analysis reports
+        id: report
+        if: steps.extract.outcome == 'success'
+        run: |
+          echo "📊 Generating performance reports..."
+          npm run report
+        continue-on-error: true
+
+      - name: Check profiler results
+        id: check_results
+        run: |
+          if [ -f ".github/scripts/pr-query-report.md" ]; then
+            echo "report_exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Profiler report generated successfully"
+          else
+            echo "report_exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No profiler report generated"
+          fi
+          
+          if [ -f ".github/scripts/queries.json" ]; then
+            QUERY_COUNT=$(jq length .github/scripts/queries.json 2>/dev/null || echo "0")
+            echo "query_count=$QUERY_COUNT" >> $GITHUB_OUTPUT
+            echo "📊 Found $QUERY_COUNT queries to analyze"
+          else
+            echo "query_count=0" >> $GITHUB_OUTPUT
+            echo "⚠️ No queries found in codebase"
+          fi
+
+      - name: Upload profiler artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mongodb-profiler-results
+          path: |
+            .github/scripts/queries.json
+            .github/scripts/profiler-output.log
+            .github/scripts/profiler-summary.log
+            .github/scripts/pr-query-report.md
+          retention-days: 30
+
+      - name: Comment PR with detailed results
+        if: github.event_name == 'pull_request' && steps.check_results.outputs.report_exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const report = fs.readFileSync('.github/scripts/pr-query-report.md', 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: report
+              });
+              
+              console.log('✅ Performance report posted to PR');
+            } catch (error) {
+              console.error('❌ Failed to post report:', error.message);
+            }
+
+      - name: Comment PR with summary when no queries found
+        if: github.event_name == 'pull_request' && steps.check_results.outputs.query_count == '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## 🔍 MongoDB Query Profiler Results
+            
+            **No MongoDB queries detected** in this PR.
+            
+            The profiler scans for:
+            - MongoDB Driver patterns: \`db.collection('name').find({})\`
+            - Chained operations: \`db.collection('name').find({}).project().sort()\`
+            - Mongoose models: \`User.findById()\`, \`Product.aggregate([])\`
+            
+            If you expected queries to be found, please check the [supported patterns](${context.payload.repository.html_url}/blob/main/README.md).`;
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Set job status based on results
+        if: always()
+        run: |
+          if [ "${{ steps.extract.outcome }}" = "failure" ]; then
+            echo "❌ Query extraction failed"
+            exit 1
+          elif [ "${{ steps.check_results.outputs.query_count }}" = "0" ]; then
+            echo "⚠️ No queries found, but pipeline succeeded"
+            exit 0
+          elif [ "${{ steps.analyze.outcome }}" = "failure" ]; then
+            echo "⚠️ Profiler analysis failed, but queries were extracted"
+            exit 0
+          else
+            echo "✅ Profiler pipeline completed successfully"
+            echo "📊 Analyzed ${{ steps.check_results.outputs.query_count }} queries"
+            exit 0
+          fi

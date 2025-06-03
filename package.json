@@ -1,16 +1,27 @@
 {
   "name": "mongo-profiler",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "MongoDB Query Profiler - Automated tool to extract, analyze, and profile MongoDB queries",
+  "main": ".github/scripts/extract-queries.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "profile": "npm run extract && npm run analyze && npm run report",
+    "extract": "node .github/scripts/extract-queries.js",
+    "analyze": "node .github/scripts/run-profiler.js",
+    "report": "node .github/scripts/analyze-explains.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "dotenv": "^16.5.0",
-    "mongodb": "^6.16.0"
-  }
+    "mongodb": "^6.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "mongodb",
+    "performance",
+    "profiler",
+    "query-analysis",
+    "database-optimization",
+    "explain-plan"
+  ],
+  "author": "MongoDB Profiler",
+  "license": "MIT"
 }

@@ -5,7 +5,7 @@ const path = require('path');
 const { MongoClient } = require('mongodb');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-const DB_NAME = 'test'; // change if needed
+const DB_NAME = process.env.DB_NAME || 'test'; // Allow DB name from env
 const QUERIES_FILE = path.resolve(__dirname, 'queries.json');
 const OUTPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
 
@@ -25,96 +25,165 @@ async function parseRawQuery(raw) {
   }
 }
 
+// Get explain result for different MongoDB operations
+async function getExplainResult(collection, method, rawQuery, pattern) {
+  try {
+    // Handle chained operations pattern
+    if (pattern === 'chained') {
+      const parsedQuery = JSON.parse(rawQuery);
+      let cursor = collection.find(parsedQuery.find ? eval(`(${parsedQuery.find})`) : {});
+      
+      // Apply other chained methods
+      if (parsedQuery.project) {
+        cursor = cursor.project(eval(`(${parsedQuery.project})`));
+      }
+      if (parsedQuery.sort) {
+        cursor = cursor.sort(eval(`(${parsedQuery.sort})`));
+      }
+      if (parsedQuery.limit) {
+        cursor = cursor.limit(parseInt(parsedQuery.limit));
+      }
+      if (parsedQuery.skip) {
+        cursor = cursor.skip(parseInt(parsedQuery.skip));
+      }
+      
+      return await cursor.explain('executionStats');
+    }
+
+    // Parse the query
+    const queryObj = await parseRawQuery(rawQuery);
+    if (!queryObj) {
+      return { error: 'Invalid query syntax' };
+    }
+
+    // Handle different MongoDB methods
+    switch (method.toLowerCase()) {
+      case 'find':
+      case 'findone':
+        return await collection.find(queryObj).explain('executionStats');
+      
+      case 'findbyid':
+        // Convert string ID to ObjectId if needed
+        const id = typeof queryObj === 'string' ? queryObj : queryObj._id || queryObj.id;
+        return await collection.find({ _id: id }).explain('executionStats');
+      
+      case 'aggregate':
+        if (!Array.isArray(queryObj)) {
+          return { error: 'Aggregate pipeline must be an array' };
+        }
+        return await collection.aggregate(queryObj).explain('executionStats');
+      
+      case 'updateone':
+      case 'updatemany':
+      case 'replaceone':
+        // For updates, explain the find part (filter)
+        if (Array.isArray(queryObj) && queryObj.length >= 1) {
+          return await collection.find(queryObj[0]).explain('executionStats');
+        }
+        return await collection.find(queryObj).explain('executionStats');
+      
+      case 'deleteone':
+      case 'deletemany':
+        return await collection.find(queryObj).explain('executionStats');
+      
+      case 'countdocuments':
+      case 'estimateddocumentcount':
+        return await collection.find(queryObj).explain('executionStats');
+      
+      case 'distinct':
+        // For distinct, we can only explain the filter part
+        if (Array.isArray(queryObj) && queryObj.length >= 2) {
+          return await collection.find(queryObj[1] || {}).explain('executionStats');
+        }
+        return await collection.find({}).explain('executionStats');
+      
+      case 'insertone':
+      case 'insertmany':
+        // Insert operations don't have meaningful explain results
+        return { info: 'Insert operations do not require query optimization' };
+      
+      default:
+        return { error: `Unsupported method: ${method}` };
+    }
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
 async function main() {
   const client = new MongoClient(MONGO_URI);
   await client.connect();
+  console.log(`Connected to MongoDB at ${MONGO_URI}`);
+  console.log(`Using database: ${DB_NAME}`);
+  
   const db = client.db(DB_NAME);
 
   if (!fs.existsSync(QUERIES_FILE)) {
     console.error('Queries file not found:', QUERIES_FILE);
+    console.log('Please run extract-queries.js first to generate the queries file.');
     process.exit(1);
   }
+  
   const queries = JSON.parse(fs.readFileSync(QUERIES_FILE, 'utf-8'));
   console.log(`Running explain on ${queries.length} queries...`);
 
+  if (queries.length === 0) {
+    console.log('No queries found to analyze. Check if extract-queries.js found any queries.');
+    await client.close();
+    return;
+  }
+
   const results = [];
 
-  for (const q of queries) {
+  for (let i = 0; i < queries.length; i++) {
+    const q = queries[i];
+    console.log(`Processing query ${i + 1}/${queries.length}: ${q.collection}.${q.method}()`);
+    
     try {
-      const { collection, method, rawQuery, file } = q;
+      const { collection, method, rawQuery, file, pattern } = q;
+      
       if (!collection) {
         results.push({ file, collection, method, rawQuery, error: 'Collection name missing' });
         continue;
       }
 
       const coll = db.collection(collection);
-      let explainResult;
+      const explainResult = await getExplainResult(coll, method, rawQuery, pattern);
 
-      if (method === 'find') {
-        // Check if rawQuery is a JSON string with find/project keys (from updated extract-queries.js)
-        let parsedQuery = null;
-        try {
-          parsedQuery = JSON.parse(rawQuery);
-        } catch {}
-
-        if (
-          parsedQuery &&
-          typeof parsedQuery === 'object' &&
-          ('find' in parsedQuery || 'project' in parsedQuery)
-        ) {
-          // Handle chained find/project calls
-          const filter = parsedQuery.find ? eval(`(${parsedQuery.find})`) : {};
-          const projection = parsedQuery.project ? eval(`(${parsedQuery.project})`) : {};
-          explainResult = await coll.find(filter).project(projection).explain('executionStats');
-        } else {
-          // Old style rawQuery: just find filter object
-          const queryObj = await parseRawQuery(rawQuery);
-          if (!queryObj) {
-            results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
-            continue;
-          }
-          explainResult = await coll.find(queryObj).explain('executionStats');
-        }
-      } else if (method === 'aggregate') {
-        const queryObj = await parseRawQuery(rawQuery);
-        if (!Array.isArray(queryObj)) {
-          results.push({ file, collection, method, rawQuery, error: 'Aggregate argument is not an array' });
-          continue;
-        }
-        explainResult = await coll.aggregate(queryObj).explain('executionStats');
-      } else if (method === 'update') {
-        const queryObj = await parseRawQuery(rawQuery);
-        if (!queryObj) {
-          results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
-          continue;
-        }
-        // Explain find for update filter
-        explainResult = await coll.find(queryObj).explain('executionStats');
-      } else if (method === 'delete') {
-        const queryObj = await parseRawQuery(rawQuery);
-        if (!queryObj) {
-          results.push({ file, collection, method, rawQuery, error: 'Invalid query syntax' });
-          continue;
-        }
-        // Explain find for delete filter
-        explainResult = await coll.find(queryObj).explain('executionStats');
-      } else {
-        explainResult = { error: 'Unsupported method ' + method };
-      }
-
-      results.push({ file, collection, method, rawQuery, explain: explainResult });
+      results.push({ 
+        file, 
+        collection, 
+        method, 
+        rawQuery, 
+        pattern: pattern || 'legacy',
+        explain: explainResult 
+      });
+      
     } catch (err) {
-      results.push({ error: err.message });
+      console.error(`Error processing query from ${q.file}:`, err.message);
+      results.push({ 
+        file: q.file, 
+        collection: q.collection, 
+        method: q.method, 
+        rawQuery: q.rawQuery,
+        error: err.message 
+      });
     }
   }
 
+  // Write results
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(results, null, 2));
-  console.log(`Explain results saved to ${OUTPUT_FILE}`);
+  console.log(`\nExplain results saved to ${OUTPUT_FILE}`);
+  
+  // Quick summary
+  const successCount = results.filter(r => r.explain && !r.error).length;
+  const errorCount = results.filter(r => r.error).length;
+  console.log(`\nSummary: ${successCount} successful, ${errorCount} errors out of ${results.length} total queries`);
 
   await client.close();
 }
 
 main().catch(err => {
-  console.error(err);
+  console.error('Error:', err);
   process.exit(1);
 });

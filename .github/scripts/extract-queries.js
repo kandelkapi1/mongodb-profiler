@@ -24,46 +24,102 @@ function findJsFiles(dir) {
 function extractQueriesFromContent(content) {
   const queries = [];
   
-  // Match basic MongoDB operations
-  const basicRegex = /db\.collection\(['"](\w+)['"]\)\s*\.(find|aggregate|update|delete)\s*\(([\s\S]*?)\)/g;
+  // Pattern 1: Direct MongoDB driver calls (db.collection('name').method())
+  const mongoDriverRegex = /(?:await\s+)?(\w+)\.collection\(['"`](\w+)['"`]\)\s*(?:\.(\w+)\s*\([^)]*\)\s*)*\.(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)/g;
   
-  // Match chained operations like .find().project()
-  const chainedRegex = /db\.collection\(['"](\w+)['"]\)\s*\.find\((.*?)\)\.project\((.*?)\)/g;
+  // Pattern 2: Chained MongoDB operations with multiple methods
+  const chainedRegex = /(?:await\s+)?(\w+)\.collection\(['"`](\w+)['"`]\)\s*((?:\.\w+\s*\([^)]*\)\s*)*)/g;
+  
+  // Pattern 3: Mongoose Model operations (Model.find(), Model.aggregate(), etc.)
+  const mongooseRegex = /(?:await\s+)?(\w+)\.(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)(?:\s*\.(\w+)\s*\([^)]*\))*/g;
+  
+  // Pattern 4: Collection variable operations (collection.find(), etc.)
+  const collectionVarRegex = /(?:await\s+)?(\w+)\.(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)/g;
 
-  // Process basic operations
+  // Process MongoDB driver patterns
   let match;
-  while ((match = basicRegex.exec(content)) !== null) {
-    const collection = match[1];
-    const method = match[2];
-    const rawQuery = match[3].trim();
+  while ((match = mongoDriverRegex.exec(content)) !== null) {
+    const dbVar = match[1];
+    const collection = match[2];
+    const method = match[4];
+    const rawQuery = match[5].trim();
 
-    // Skip queries containing ellipsis or empty placeholders
-    if (/\.{3}/.test(rawQuery) || rawQuery === '{}' || rawQuery === '[]') {
+    // Skip empty or placeholder queries
+    if (!rawQuery || rawQuery === '{}' || rawQuery === '[]' || /\.{3}/.test(rawQuery)) {
       continue;
     }
 
-    queries.push({ collection, method, rawQuery });
+    queries.push({ 
+      collection, 
+      method, 
+      rawQuery,
+      pattern: 'mongodb-driver',
+      dbVar 
+    });
   }
 
   // Process chained operations
   while ((match = chainedRegex.exec(content)) !== null) {
-    const collection = match[1];
-    const findQuery = match[2].trim();
-    const projectQuery = match[3].trim();
+    const dbVar = match[1];
+    const collection = match[2];
+    const chainedMethods = match[3];
+    
+    // Parse chained methods
+    const methodMatches = [...chainedMethods.matchAll(/\.(\w+)\s*\(([^)]*)\)/g)];
+    
+    if (methodMatches.length > 0) {
+      const primaryMethod = methodMatches[0];
+      const method = primaryMethod[1];
+      const rawQuery = primaryMethod[2].trim();
+      
+      // Build query object for chained operations
+      const queryParts = {};
+      methodMatches.forEach(m => {
+        const methodName = m[1];
+        const methodArgs = m[2].trim();
+        if (methodArgs && methodArgs !== '{}' && !methodArgs.includes('...')) {
+          queryParts[methodName] = methodArgs;
+        }
+      });
 
-    // Skip if either part is a placeholder
-    if ((/\.{3}/.test(findQuery) || findQuery === '{}') && 
-        (/\.{3}/.test(projectQuery) || projectQuery === '{}')) {
-      continue;
+      if (Object.keys(queryParts).length > 0) {
+        queries.push({
+          collection,
+          method,
+          rawQuery: JSON.stringify(queryParts),
+          pattern: 'chained',
+          dbVar
+        });
+      }
     }
+  }
 
-    // Create a structured query object
-    const rawQuery = JSON.stringify({
-      find: findQuery,
-      project: projectQuery
-    });
-
-    queries.push({ collection, method: 'find', rawQuery });
+  // Process potential Mongoose patterns
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Look for Model.method() patterns
+    const modelMatch = line.match(/(?:await\s+)?(\w+)\.(\w+)\s*\(([^)]*)\)/);
+    if (modelMatch) {
+      const modelName = modelMatch[1];
+      const method = modelMatch[2];
+      const args = modelMatch[3].trim();
+      
+      // Check if this looks like a MongoDB method
+      const mongoMethods = ['find', 'findOne', 'findById', 'aggregate', 'updateOne', 'updateMany', 
+                           'deleteOne', 'deleteMany', 'insertOne', 'insertMany', 'countDocuments', 
+                           'distinct', 'replaceOne'];
+      
+      if (mongoMethods.includes(method) && args && args !== '{}' && !args.includes('...')) {
+        queries.push({
+          collection: modelName.toLowerCase(), // Assume model name is collection name
+          method,
+          rawQuery: args,
+          pattern: 'mongoose-model'
+        });
+      }
+    }
   }
 
   return queries;
@@ -75,16 +131,29 @@ async function main() {
 
   const allQueries = [];
   for (const file of files) {
-    const content = fs.readFileSync(file, 'utf-8');
-    const queries = extractQueriesFromContent(content);
-    if (queries.length > 0) {
-      queries.forEach(q => q.file = file);
-      allQueries.push(...queries);
+    try {
+      const content = fs.readFileSync(file, 'utf-8');
+      const queries = extractQueriesFromContent(content);
+      if (queries.length > 0) {
+        console.log(`Found ${queries.length} queries in ${file}`);
+        queries.forEach(q => q.file = file);
+        allQueries.push(...queries);
+      }
+    } catch (err) {
+      console.warn(`Error reading file ${file}:`, err.message);
     }
   }
 
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allQueries, null, 2));
   console.log(`Extracted ${allQueries.length} queries to ${OUTPUT_FILE}`);
+  
+  // Log some examples for debugging
+  if (allQueries.length > 0) {
+    console.log('\nExample queries found:');
+    allQueries.slice(0, 3).forEach((q, i) => {
+      console.log(`${i + 1}. ${q.collection}.${q.method}() from ${q.file}`);
+    });
+  }
 }
 
 main().catch(err => {
