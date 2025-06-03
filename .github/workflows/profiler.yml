@@ -16,11 +16,11 @@ jobs:
         env:
           MONGO_INITDB_DATABASE: test
         options: >-
-          --health-cmd "mongod --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 40s
+          --health-cmd "test -e /tmp/mongodb-27017.sock || mongod --version"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+          --health-start-period 60s
 
     steps:
       - name: Checkout code
@@ -46,11 +46,35 @@ jobs:
           fi
           echo "DB_NAME=test" >> $GITHUB_ENV
 
-      - name: Wait for MongoDB service
+      - name: Debug MongoDB service
         run: |
-          echo "Waiting for MongoDB service to be ready..."
-          timeout 60 bash -c 'until nc -z localhost 27017; do sleep 2; done'
-          echo "✅ MongoDB port 27017 is open!"
+          echo "Checking MongoDB service status..."
+          docker ps -a | grep mongo || echo "No MongoDB containers found"
+          
+          echo "Checking if port 27017 is open..."
+          netstat -tuln | grep 27017 || echo "Port 27017 not found"
+          
+          echo "Attempting to connect to localhost:27017..."
+          timeout 5 bash -c '</dev/tcp/localhost/27017' && echo "Port accessible" || echo "Port not accessible"
+
+      - name: Wait for MongoDB with simple approach
+        run: |
+          echo "Waiting for MongoDB to be ready..."
+          
+          # Wait for port to be open
+          for i in {1..30}; do
+            if nc -z localhost 27017; then
+              echo "✅ MongoDB port 27017 is responding (attempt $i)"
+              break
+            else
+              echo "Waiting for MongoDB... (attempt $i/30)"
+              sleep 2
+            fi
+          done
+          
+          # Give MongoDB a few more seconds to fully initialize
+          echo "Giving MongoDB time to fully initialize..."
+          sleep 10
 
       - name: Test MongoDB connection with Node.js
         run: |
@@ -59,7 +83,12 @@ jobs:
           const { MongoClient } = require('mongodb');
           (async () => {
             try {
-              const client = new MongoClient('${{ env.MONGO_URI }}');
+              const client = new MongoClient('${{ env.MONGO_URI }}', {
+                serverSelectionTimeoutMS: 5000,
+                connectTimeoutMS: 5000
+              });
+              
+              console.log('Attempting to connect to MongoDB...');
               await client.connect();
               console.log('✅ MongoDB connection successful!');
               
@@ -77,6 +106,7 @@ jobs:
               console.log('✅ MongoDB connection test completed successfully!');
             } catch (error) {
               console.error('❌ MongoDB connection failed:', error.message);
+              console.error('Full error:', error);
               process.exit(1);
             }
           })();
@@ -95,10 +125,10 @@ jobs:
           echo "Checking extracted queries..."
           if [ -f ".github/scripts/queries.json" ]; then
             echo "✅ Queries extracted:"
-            cat .github/scripts/queries.json | jq '.'
+            cat .github/scripts/queries.json | jq '.' || cat .github/scripts/queries.json
           else
             echo "❌ No queries.json file found"
-            ls -la .github/scripts/
+            ls -la .github/scripts/ || echo "Scripts directory not found"
           fi
 
       - name: Run profiler on extracted queries
