@@ -9,12 +9,11 @@ async function main() {
     await client.connect();
     const db = client.db('live');
 
-    const result = await db.collection('loads')
-      .find({})
-      .project({ caller: 1, reference_number: 1 })
-      .toArray(); // Convert cursor to array
+    db.collection('loads').find({ 
+      reference_number: "M002110"
+    }).toArray(); // Convert cursor to array
 
-    console.log(result);
+    console.log(result.length);
   } catch (err) {
     console.error('Error:', err);
   } finally {
