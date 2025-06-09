@@ -1,0 +1,527 @@
+[
+  {
+    "v": 2,
+    "key": {
+      "_id": 1
+    },
+    "name": "_id_"
+  },
+  {
+    "v": 2,
+    "key": {
+      "containerNo": 1
+    },
+    "name": "containerNo",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "createdAt": -1
+    },
+    "name": "createdAt_-1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1
+    },
+    "name": "carrier_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "caller": -1
+    },
+    "name": "caller"
+  },
+  {
+    "v": 2,
+    "key": {
+      "driver": -1
+    },
+    "name": "driver"
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "status": 1,
+      "isDeleted": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_status_1_isDeleted_1_createdAt_-1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "reference_number": 1,
+      "isDeleted": 1,
+      "createdAt": -1
+    },
+    "name": "reference_number_1_isDeleted_1_createdAt_-1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "reference_number": 1,
+      "isDeleted": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_reference_number_1_isDeleted_1_createdAt_-1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "statusOrder.driver": 1,
+      "loadAssignedDate": 1
+    },
+    "name": "statusOrder.driver_1_loadAssignedDate_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "isDeleted": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_isDeleted_1_createdAt_-1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "consignee": -1
+    },
+    "name": "consignee"
+  },
+  {
+    "v": 2,
+    "key": {
+      "driverOrder.driver": 1,
+      "loadAssignedDate": 1
+    },
+    "name": "driverOrder.driver_1_loadAssignedDate_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "isEmptyOrigin": 1
+    },
+    "name": "isEmptyOrigin_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "isLastFreeDay": 1
+    },
+    "name": "isLastFreeDay_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "emptyDay": -1
+    },
+    "name": "emptyDay_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "emptyDay": 1
+    },
+    "name": "emptyDay_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "pickupTimes.pickupFromTime": -1
+    },
+    "name": "pickupTimes.pickupFromTime_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "pickupTimes.pickupFromTime": 1
+    },
+    "name": "pickupTimes.pickupFromTime_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "deliveryTimes.deliveryFromTime": -1
+    },
+    "name": "deliveryTimes.deliveryFromTime_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "deliveryTimes.deliveryFromTime": 1
+    },
+    "name": "deliveryTimes.deliveryFromTime_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "containerAvailableDay": -1
+    },
+    "name": "containerAvailableDay_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "containerAvailableDay": 1
+    },
+    "name": "containerAvailableDay_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "allStatusDates.dropContainerDeparted": -1
+    },
+    "name": "allStatusDates.dropContainerDeparted_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "lastFreeDay": 1
+    },
+    "name": "lastFreeDay_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "lastFreeDay": -1
+    },
+    "name": "lastFreeDay_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "grayChassisNo": 1
+    },
+    "name": "grayChassisNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "grayContainerOwnerName": 1
+    },
+    "name": "grayContainerOwnerName_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "grayContainerNo": 1
+    },
+    "name": "grayContainerNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "cutOff": 1
+    },
+    "name": "cutOff_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "freeReturnDate": 1
+    },
+    "name": "freeReturnDate_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "callerbillLandingNo": 1
+    },
+    "name": "callerbillLandingNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "callerBookingNo": 1
+    },
+    "name": "callerBookingNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "callerPONo": 1
+    },
+    "name": "callerPONo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "secondaryReferenceNo": 1
+    },
+    "name": "secondaryReferenceNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "releaseNo": 1
+    },
+    "name": "releaseNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "sealNo": 1
+    },
+    "name": "sealNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "shipmentNo": 1
+    },
+    "name": "shipmentNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "doNo": 1
+    },
+    "name": "doNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "purchaseOrderNo": 1
+    },
+    "name": "purchaseOrderNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "deliveryOrderNo": 1
+    },
+    "name": "deliveryOrderNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "chassisNo": 1
+    },
+    "name": "chassisNo_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "isDeleted": 1
+    },
+    "name": "isDeleted_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "statusHistory.createdAt": 1
+    },
+    "name": "statusHistory.createdAt_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "callerName": 1
+    },
+    "name": "callerName_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "driverName": 1
+    },
+    "name": "driverName_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "terminal": 1
+    },
+    "name": "terminal_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "previousRevisionNumber": 1
+    },
+    "name": "previousRevisionNumber_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "isCustom": 1
+    },
+    "name": "isCustom_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "isFreight": 1
+    },
+    "name": "isFreight_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "reference_number": 1
+    },
+    "name": "reference_number_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "updatedAt": 1
+    },
+    "name": "updatedAt",
+    "background": false
+  },
+  {
+    "v": 2,
+    "key": {
+      "billingDate": -1
+    },
+    "name": "billingDate_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "billingDate": 1
+    },
+    "name": "billingDate_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "orderId": 1
+    },
+    "name": "orderId_1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "status": 1
+    },
+    "name": "status_1",
+    "background": true
+  },
+  {
+    "v": 2,
+    "key": {
+      "createdAt": -1,
+      "driverOrder.driver": -1,
+      "isDeleted": -1
+    },
+    "name": "createdAt_-1_driverOrder.driver_-1_isDeleted_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "masterSearchText": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_masterSearchText_1_createdAt_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "_fts": "text",
+      "_ftsx": 1
+    },
+    "name": "containerNo_text",
+    "weights": {
+      "containerNo": 1
+    },
+    "default_language": "english",
+    "language_override": "language",
+    "textIndexVersion": 3
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "isDeleted": 1,
+      "status": 1,
+      "type_of_load": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_isDeleted_1_status_1_type_of_load_1_createdAt_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "isDeleted": 1,
+      "status": 1,
+      "loadCompletedAt": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_isDeleted_1_status_1_loadCompletedAt_1_createdAt_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "isDeleted": 1,
+      "status": 1,
+      "driverOrder.type": 1,
+      "driverOrder.departed": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_isDeleted_1_status_1_driverOrder.type_1_driverOrder.departed_1_createdAt_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": -1
+    },
+    "name": "carrier_-1"
+  },
+  {
+    "v": 2,
+    "key": {
+      "carrier": 1,
+      "isDeleted": 1,
+      "status": 1,
+      "createdAt": -1
+    },
+    "name": "carrier_1_isDeleted_1_status_1_createdAt_-1",
+    "background": true
+  }
+]
