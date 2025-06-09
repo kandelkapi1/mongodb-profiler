@@ -144,6 +144,13 @@ async function main() {
     }
   }
 
+  // Ensure reports directory exists
+  const reportsDir = path.dirname(OUTPUT_FILE);
+  if (!fs.existsSync(reportsDir)) {
+    fs.mkdirSync(reportsDir, { recursive: true });
+    console.log(`Created reports directory: ${reportsDir}`);
+  }
+
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allQueries, null, 2));
   console.log(`Extracted ${allQueries.length} queries to ${OUTPUT_FILE}`);
   
