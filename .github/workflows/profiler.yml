@@ -10,17 +10,19 @@ jobs:
     
     services:
       mongodb:
-        image: mongo:4.4
+        image: mongo:6.0
         ports:
           - 27017:27017
         env:
-          MONGO_INITDB_DATABASE: ${{ env.DB_NAME }}
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: password
+          MONGO_INITDB_DATABASE: live
         options: >-
-          --health-cmd "data -e /tmp/mongodb-27017.sock || mongod --version"
-          --health-interval 30s
-          --health-timeout 10s
-          --health-retries 5
-          --health-start-period 60s
+          --health-cmd "mongosh --eval 'db.admin().ping()'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 40s
 
     steps:
       - name: Checkout code
@@ -47,12 +49,12 @@ jobs:
           if [ -n "$MONGO_URI" ]; then
             echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
           else
-            echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
+            echo "MONGO_URI=mongodb://admin:password@localhost:27017" >> $GITHUB_ENV
           fi
           if [ -n "$DB_NAME" ]; then
             echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
           else
-            echo "DB_NAME=data" >> $GITHUB_ENV
+            echo "DB_NAME=live" >> $GITHUB_ENV
           fi
           
           # Performance thresholds (with defaults if not set in secrets)
@@ -119,7 +121,8 @@ jobs:
             try {
               const client = new MongoClient('${{ env.MONGO_URI }}', {
                 serverSelectionTimeoutMS: 5000,
-                connectTimeoutMS: 5000
+                connectTimeoutMS: 5000,
+                authSource: 'admin'
               });
               
               console.log('Attempting to connect to MongoDB...');
@@ -146,6 +149,47 @@ jobs:
           })();
           "
 
+      - name: Load test data from datas folder
+        run: |
+          echo "📁 Loading data from datas folder..."
+          echo "Using MONGO_URI: ${{ env.MONGO_URI }}"
+          echo "Using DB_NAME: ${{ env.DB_NAME }}"
+          npm run load-data
+        env:
+          MONGO_URI: ${{ env.MONGO_URI }}
+          DB_NAME: ${{ env.DB_NAME }}
+          FORCE_RELOAD: "true"
+
+      - name: Verify data loading
+        run: |
+          echo "🔍 Verifying data was loaded correctly..."
+          node -e "
+          const { MongoClient } = require('mongodb');
+          (async () => {
+            try {
+              const client = new MongoClient('${{ env.MONGO_URI }}', {
+                authSource: 'admin'
+              });
+              await client.connect();
+              
+              const db = client.db('${{ env.DB_NAME }}');
+              const collections = await db.listCollections().toArray();
+              
+              console.log('Available collections:');
+              for (const collection of collections) {
+                const count = await db.collection(collection.name).countDocuments();
+                console.log(\`  - \${collection.name}: \${count} documents\`);
+              }
+              
+              await client.close();
+              console.log('✅ Data verification completed');
+            } catch (error) {
+              console.error('❌ Data verification failed:', error.message);
+              process.exit(1);
+            }
+          })();
+          "
+
       - name: Extract MongoDB queries
         id: extract
         run: |
@@ -157,12 +201,12 @@ jobs:
         if: always()
         run: |
           echo "Checking extracted queries..."
-          if [ -f ".github/scripts/queries.json" ]; then
+          if [ -f "reports/queries.json" ]; then
             echo "✅ Queries extracted:"
-            cat .github/scripts/queries.json | jq '.' || cat .github/scripts/queries.json
+            cat reports/queries.json | jq '.' || cat reports/queries.json
           else
             echo "❌ No queries.json file found"
-            ls -la .github/scripts/ || echo "Scripts directory not found"
+            ls -la reports/ || echo "Reports directory not found"
           fi
 
       - name: Run profiler on extracted queries
@@ -185,18 +229,18 @@ jobs:
         if: always()
         run: |
           echo "Checking profiler output files..."
-          ls -la .github/scripts/ || echo "Scripts directory not found"
+          ls -la reports/ || echo "Reports directory not found"
           
           echo -e "\n=== Profiler Output Log ==="
-          if [ -f ".github/scripts/profiler-output.log" ]; then
-            head -20 .github/scripts/profiler-output.log
+          if [ -f "reports/profiler-output.log" ]; then
+            head -20 reports/profiler-output.log
           else
             echo "No profiler-output.log found"
           fi
           
           echo -e "\n=== Analysis Summary ==="
-          if [ -f ".github/scripts/profiler-summary.log" ]; then
-            head -20 .github/scripts/profiler-summary.log
+          if [ -f "reports/profiler-summary.log" ]; then
+            head -20 reports/profiler-summary.log
           else
             echo "No profiler-summary.log found"
           fi
@@ -204,7 +248,7 @@ jobs:
       - name: Check profiler results
         id: check_results
         run: |
-          if [ -f ".github/scripts/pr-query-report.md" ]; then
+          if [ -f "reports/pr-query-report.md" ]; then
             echo "report_exists=true" >> $GITHUB_OUTPUT
             echo "✅ Profiler report generated successfully"
           else
@@ -212,8 +256,8 @@ jobs:
             echo "⚠️ No profiler report generated"
           fi
           
-          if [ -f ".github/scripts/queries.json" ]; then
-            QUERY_COUNT=$(jq length .github/scripts/queries.json 2>/dev/null || echo "0")
+          if [ -f "reports/queries.json" ]; then
+            QUERY_COUNT=$(jq length reports/queries.json 2>/dev/null || echo "0")
             echo "query_count=$QUERY_COUNT" >> $GITHUB_OUTPUT
             echo "📊 Found $QUERY_COUNT queries to analyze"
           else
@@ -227,10 +271,10 @@ jobs:
         with:
           name: mongodb-profiler-results
           path: |
-            .github/scripts/queries.json
-            .github/scripts/profiler-output.log
-            .github/scripts/profiler-summary.log
-            .github/scripts/pr-query-report.md
+            reports/queries.json
+            reports/profiler-output.log
+            reports/profiler-summary.log
+            reports/pr-query-report.md
           retention-days: 30
 
       - name: Comment PR with detailed results
@@ -241,7 +285,7 @@ jobs:
             const fs = require('fs');
             
             try {
-              const report = fs.readFileSync('.github/scripts/pr-query-report.md', 'utf8');
+              const report = fs.readFileSync('reports/pr-query-report.md', 'utf8');
               
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,

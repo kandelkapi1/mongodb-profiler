@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SEARCH_DIR = './';  // Root directory to scan
-const OUTPUT_FILE = path.resolve(__dirname, 'queries.json');
+const OUTPUT_FILE = path.resolve(__dirname, '../../reports/queries.json');
 
 // Recursively find JS/TS files in a directory
 function findJsFiles(dir) {

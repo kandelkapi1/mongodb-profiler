@@ -2,9 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const INPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
-const SUMMARY_FILE = path.resolve(__dirname, 'profiler-summary.log');
-const PR_REPORT_FILE = path.resolve(__dirname, 'pr-query-report.md');
+const INPUT_FILE = path.resolve(__dirname, '../../reports/profiler-output.log');
+const SUMMARY_FILE = path.resolve(__dirname, '../../reports/profiler-summary.log');
+const PR_REPORT_FILE = path.resolve(__dirname, '../../reports/pr-query-report.md');
 
 // Performance thresholds from environment variables or defaults
 const THRESHOLDS = {

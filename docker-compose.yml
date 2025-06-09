@@ -1,0 +1,28 @@
+# Docker Compose configuration for MongoDB Profiler
+# This file is used by the Docker-based setup scripts
+# For local development without Docker, use: npm run setup-local-mongo
+
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: mongo-profiler-db
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: live
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - mongo-profiler-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  mongo-profiler-network:
+    driver: bridge 

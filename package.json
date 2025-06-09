@@ -7,7 +7,15 @@
     "profile": "npm run extract && npm run analyze && npm run report",
     "extract": "node .github/scripts/extract-queries.js",
     "analyze": "node .github/scripts/run-profiler.js",
-    "report": "node .github/scripts/analyze-explains.js"
+    "report": "node .github/scripts/analyze-explains.js",
+    "setup-db": "node .github/scripts/setup-local-db.js",
+    "setup-local-mongo": "node .github/scripts/setup-local-mongo.js",
+    "load-data": "node .github/scripts/load-data.js",
+    "start-db": "docker start mongo-profiler-db || docker run -d --name mongo-profiler-db -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=password -e MONGO_INITDB_DATABASE=live -v mongo-profiler-data:/data/db mongo:6.0",
+    "stop-db": "docker stop mongo-profiler-db",
+    "db-status": "docker ps -f name=mongo-profiler-db",
+    "profile-local": "MONGO_URI=mongodb://admin:password@localhost:27017 DB_NAME=live npm run profile",
+    "profile-local-mongo": "MONGO_URI=mongodb://localhost:27017 DB_NAME=live npm run profile"
   },
   "dependencies": {
     "mongodb": "^6.0.0",

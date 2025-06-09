@@ -5,9 +5,9 @@ const path = require('path');
 const { MongoClient } = require('mongodb');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-const DB_NAME = process.env.DB_NAME || 'data'; // Allow DB name from env
-const QUERIES_FILE = path.resolve(__dirname, 'queries.json');
-const OUTPUT_FILE = path.resolve(__dirname, 'profiler-output.log');
+const DB_NAME = process.env.DB_NAME || 'live'; // Allow DB name from env
+const QUERIES_FILE = path.resolve(__dirname, '../../reports/queries.json');
+const OUTPUT_FILE = path.resolve(__dirname, '../../reports/profiler-output.log');
 const MAX_DOCS_EXAMINED = parseInt(process.env.MAX_DOCS_EXAMINED) || 500; // Limit docs examined for profiling
 
 // Parse raw query string into JS object
@@ -113,7 +113,12 @@ async function getExplainResult(collection, method, rawQuery, pattern) {
 }
 
 async function main() {
-  const client = new MongoClient(MONGO_URI);
+  const clientOptions = {};
+  if (MONGO_URI.includes('@')) {
+    clientOptions.authSource = 'admin';
+  }
+  
+  const client = new MongoClient(MONGO_URI, clientOptions);
   await client.connect();
   console.log(`Connected to MongoDB at ${MONGO_URI}`);
   console.log(`Using database: ${DB_NAME}`);

@@ -4,11 +4,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# MongoDB Profiler Output Files
-.github/scripts/queries.json
-.github/scripts/profiler-output.log
-.github/scripts/profiler-summary.log
-.github/scripts/pr-query-report.md
+# MongoDB Profiler Output Files (now in reports directory)
+reports/
 
 # Environment variables
 .env
@@ -41,3 +38,10 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Docker MongoDB data
+mongo-init/data/
+.env.local
+
+# Large data files (optional - uncomment if you don't want to commit data files)
+# datas/*.json
