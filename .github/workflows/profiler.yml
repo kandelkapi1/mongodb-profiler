@@ -29,23 +29,18 @@ jobs:
 
       - name: Set up environment
         env:
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-          DB_NAME: ${{ secrets.DB_NAME }}
           MAX_EXECUTION_TIME_MS: ${{ secrets.MAX_EXECUTION_TIME_MS }}
           WARN_EXECUTION_TIME_MS: ${{ secrets.WARN_EXECUTION_TIME_MS }}
           MAX_DOCS_EXAMINED: ${{ secrets.MAX_DOCS_EXAMINED }}
           MIN_QUERY_EFFICIENCY: ${{ secrets.MIN_QUERY_EFFICIENCY }}
         run: |
-          if [ -n "$MONGO_URI" ]; then
-            echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
-          else
-            echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
-          fi
-          if [ -n "$DB_NAME" ]; then
-            echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
-          else
-            echo "DB_NAME=live" >> $GITHUB_ENV
-          fi
+          # Always use Docker MongoDB container in CI - ignore any environment secrets
+          echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
+          echo "DB_NAME=live" >> $GITHUB_ENV
+          
+          echo "🐳 Using Docker MongoDB container (ignoring env secrets)"
+          echo "Connection: mongodb://localhost:27017"
+          echo "Database: live"
           
           # Performance thresholds (with defaults if not set in secrets)
           if [ -n "$MAX_EXECUTION_TIME_MS" ]; then
@@ -111,16 +106,16 @@ jobs:
           const { MongoClient } = require('mongodb');
           (async () => {
             try {
-              const client = new MongoClient('${{ env.MONGO_URI }}', {
+              const client = new MongoClient('mongodb://localhost:27017', {
                 serverSelectionTimeoutMS: 5000,
                 connectTimeoutMS: 5000
               });
               
-              console.log('Attempting to connect to MongoDB...');
+              console.log('Attempting to connect to Docker MongoDB...');
               await client.connect();
               console.log('✅ MongoDB connection successful!');
               
-              const db = client.db('${{ env.DB_NAME }}');
+              const db = client.db('live');
               const result = await db.admin().ping();
               console.log('✅ Database ping successful:', result);
               
@@ -131,7 +126,7 @@ jobs:
               console.log('✅ Test document operations successful. Count:', count);
               
               await client.close();
-              console.log('✅ MongoDB connection data completed successfully!');
+              console.log('✅ MongoDB connection completed successfully!');
             } catch (error) {
               console.error('❌ MongoDB connection failed:', error.message);
               console.error('Full error:', error);
@@ -158,10 +153,10 @@ jobs:
           const { MongoClient } = require('mongodb');
           (async () => {
             try {
-              const client = new MongoClient('${{ env.MONGO_URI }}');
+              const client = new MongoClient('mongodb://localhost:27017');
               await client.connect();
               
-              const db = client.db('${{ env.DB_NAME }}');
+              const db = client.db('live');
               const collections = await db.listCollections().toArray();
               
               console.log('Available collections:');
