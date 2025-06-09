@@ -71,18 +71,31 @@ async function loadData() {
         }
 
         // Get all JSON files from data directory
-        const files = fs.readdirSync(DATA_DIR).filter(file => file.endsWith('.json'));
+        const allFiles = fs.readdirSync(DATA_DIR).filter(file => file.endsWith('.json'));
         
-        if (files.length === 0) {
+        // Separate data files from index files
+        const dataFiles = allFiles.filter(file => !file.endsWith('.index.json'));
+        const indexFiles = allFiles.filter(file => file.endsWith('.index.json'));
+        
+        if (allFiles.length === 0) {
             console.log('⚠️  No JSON files found in data directory');
             return;
         }
 
-        console.log(`📁 Found ${files.length} data file(s) to load:`);
-        files.forEach(file => console.log(`   - ${file}`));
+        console.log(`📁 Found ${allFiles.length} file(s):`);
+        console.log(`   - ${dataFiles.length} data file(s)`);
+        dataFiles.forEach(file => console.log(`     * ${file}`));
+        console.log(`   - ${indexFiles.length} index file(s)`);
+        indexFiles.forEach(file => console.log(`     * ${file}`));
 
-        for (const file of files) {
+        // Load data files first
+        for (const file of dataFiles) {
             await loadFile(client, file);
+        }
+
+        // Then apply indexes
+        for (const file of indexFiles) {
+            await applyIndexes(client, file);
         }
 
         console.log('🎉 Data loading completed successfully!');
@@ -195,6 +208,106 @@ async function loadFile(client, filename) {
 
     } catch (error) {
         console.error(`   ❌ Failed to load ${filename}:`, error);
+    }
+}
+
+async function applyIndexes(client, filename) {
+    const filePath = path.join(DATA_DIR, filename);
+    
+    // Parse database and collection from filename
+    // Format: database.collection.index.json
+    const nameWithoutExt = filename.replace('.index.json', '');
+    const parts = nameWithoutExt.split('.');
+    
+    if (parts.length < 2) {
+        console.log(`⚠️  Skipping ${filename} - invalid naming format (expected: database.collection.index.json)`);
+        return;
+    }
+
+    const dbName = parts[0];
+    const collectionName = parts.slice(1).join('.'); // Handle collection names with dots
+
+    console.log(`\n🗂️  Applying indexes from ${filename} -> ${dbName}.${collectionName}`);
+
+    try {
+        // Read and parse index file
+        console.log('   📖 Reading index definitions...');
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        
+        let indexes;
+        try {
+            indexes = JSON.parse(fileContent);
+        } catch (parseError) {
+            console.error(`   ❌ Failed to parse JSON in ${filename}:`, parseError.message);
+            return;
+        }
+
+        // Ensure indexes is an array
+        if (!Array.isArray(indexes)) {
+            console.log('   ⚠️  Index file should contain an array of index definitions');
+            return;
+        }
+
+        if (indexes.length === 0) {
+            console.log('   ⚠️  No indexes to create');
+            return;
+        }
+
+        console.log(`   📝 Found ${indexes.length} index definitions`);
+
+        // Get database and collection
+        const db = client.db(dbName);
+        const collection = db.collection(collectionName);
+
+        // Check if collection exists
+        const collections = await db.listCollections({ name: collectionName }).toArray();
+        if (collections.length === 0) {
+            console.log(`   ⚠️  Collection ${dbName}.${collectionName} doesn't exist, creating it first...`);
+            // Insert a dummy document to create the collection, then remove it
+            const tempResult = await collection.insertOne({ _temp: true });
+            await collection.deleteOne({ _id: tempResult.insertedId });
+        }
+
+        // Apply indexes (skip the default _id index)
+        let createdCount = 0;
+        for (const indexDef of indexes) {
+            try {
+                // Skip the default _id index
+                if (indexDef.name === '_id_') {
+                    console.log(`   ⏭️  Skipping default _id index`);
+                    continue;
+                }
+
+                // Create index options
+                const options = {
+                    name: indexDef.name
+                };
+                
+                // Add optional properties if they exist
+                if (indexDef.background !== undefined) options.background = indexDef.background;
+                if (indexDef.unique !== undefined) options.unique = indexDef.unique;
+                if (indexDef.sparse !== undefined) options.sparse = indexDef.sparse;
+                if (indexDef.expireAfterSeconds !== undefined) options.expireAfterSeconds = indexDef.expireAfterSeconds;
+                if (indexDef.partialFilterExpression !== undefined) options.partialFilterExpression = indexDef.partialFilterExpression;
+
+                await collection.createIndex(indexDef.key, options);
+                console.log(`   ✅ Created index: ${indexDef.name}`);
+                createdCount++;
+                
+            } catch (indexError) {
+                // If index already exists, that's usually OK
+                if (indexError.code === 85 || indexError.message.includes('already exists')) {
+                    console.log(`   ⚠️  Index ${indexDef.name} already exists, skipping`);
+                } else {
+                    console.error(`   ❌ Failed to create index ${indexDef.name}:`, indexError.message);
+                }
+            }
+        }
+
+        console.log(`   ✅ Successfully applied ${createdCount} new indexes to ${dbName}.${collectionName}`);
+
+    } catch (error) {
+        console.error(`   ❌ Failed to apply indexes from ${filename}:`, error);
     }
 }
 
