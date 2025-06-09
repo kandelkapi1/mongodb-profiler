@@ -10,19 +10,9 @@ jobs:
     
     services:
       mongodb:
-        image: mongo:6.0
+        image: mongo:5.0
         ports:
           - 27017:27017
-        env:
-          MONGO_INITDB_ROOT_USERNAME: admin
-          MONGO_INITDB_ROOT_PASSWORD: password
-          MONGO_INITDB_DATABASE: live
-        options: >-
-          --health-cmd "mongosh --eval 'db.admin().ping()'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 40s
 
     steps:
       - name: Checkout code
@@ -49,7 +39,7 @@ jobs:
           if [ -n "$MONGO_URI" ]; then
             echo "MONGO_URI=$MONGO_URI" >> $GITHUB_ENV
           else
-            echo "MONGO_URI=mongodb://admin:password@localhost:27017" >> $GITHUB_ENV
+            echo "MONGO_URI=mongodb://localhost:27017" >> $GITHUB_ENV
           fi
           if [ -n "$DB_NAME" ]; then
             echo "DB_NAME=$DB_NAME" >> $GITHUB_ENV
@@ -93,7 +83,7 @@ jobs:
           echo "Attempting to connect to localhost:27017..."
           timeout 5 bash -c '</dev/tcp/localhost/27017' && echo "Port accessible" || echo "Port not accessible"
 
-      - name: Wait for MongoDB with simple approach
+      - name: Wait for MongoDB to be ready
         run: |
           echo "Waiting for MongoDB to be ready..."
           
@@ -103,14 +93,16 @@ jobs:
               echo "✅ MongoDB port 27017 is responding (attempt $i)"
               break
             else
-              echo "Waiting for MongoDB... (attempt $i/30)"
-              sleep 2
+              echo "Waiting for port 27017... (attempt $i/30)"
+              sleep 3
             fi
           done
           
           # Give MongoDB a few more seconds to fully initialize
           echo "Giving MongoDB time to fully initialize..."
           sleep 10
+          
+          echo "✅ MongoDB should be ready"
 
       - name: Test MongoDB connection with Node.js
         run: |
@@ -121,8 +113,7 @@ jobs:
             try {
               const client = new MongoClient('${{ env.MONGO_URI }}', {
                 serverSelectionTimeoutMS: 5000,
-                connectTimeoutMS: 5000,
-                authSource: 'admin'
+                connectTimeoutMS: 5000
               });
               
               console.log('Attempting to connect to MongoDB...');
@@ -167,9 +158,7 @@ jobs:
           const { MongoClient } = require('mongodb');
           (async () => {
             try {
-              const client = new MongoClient('${{ env.MONGO_URI }}', {
-                authSource: 'admin'
-              });
+              const client = new MongoClient('${{ env.MONGO_URI }}');
               await client.connect();
               
               const db = client.db('${{ env.DB_NAME }}');
